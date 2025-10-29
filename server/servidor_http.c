@@ -8,7 +8,6 @@
 
 #define BUFFER_SIZE 4096
 
-/* A função send_file permanece idêntica */
 void send_file(int client, const char *path) {
     /* Tenta abrir o arquivo pedido em modo "leitura binária" (rb). */
     FILE *file = fopen(path, "rb");
@@ -34,7 +33,7 @@ void send_file(int client, const char *path) {
     fclose(file);
 }
 
-/* A função list_directory permanece idêntica */
+
 void list_directory(int client, const char *dirpath) {
     DIR *dir = opendir(dirpath);
     if (!dir) {
@@ -73,19 +72,18 @@ int main(int argc, char *argv[]) {
 
     /* 1. Cria o 'conector' (socket) principal do servidor. */
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0) { // Adicionada verificação de erro
+    if (server_fd < 0) { 
         perror("socket");
         exit(EXIT_FAILURE);
     }
 
-    /* --- CORREÇÃO 1: Adiciona SO_REUSEADDR --- */
+
     /* Esta opção permite ao servidor reiniciar rápido sem o erro "Address already in use". */
     int opt = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
-    /* --- FIM DA CORREÇÃO 1 --- */
 
 
     /* 2. Define as configurações: porta 5050 e escutar em qualquer IP local. */
@@ -101,7 +99,7 @@ int main(int argc, char *argv[]) {
     }
     
     /* 4. Coloca o servidor em modo de "escuta" (pronto para aceitar clientes). */
-    if (listen(server_fd, 5) < 0) { // Adicionada verificação de erro
+    if (listen(server_fd, 5) < 0) { 
         perror("listen");
         exit(EXIT_FAILURE);
     }
@@ -112,9 +110,9 @@ int main(int argc, char *argv[]) {
     while (1) {
         /* 5. PAUSA e espera por uma nova conexão */
         client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
-        if (client_fd < 0) { // Adicionada verificação de erro
+        if (client_fd < 0) { 
             perror("accept");
-            continue; // Pula para a próxima iteração do loop
+            continue; 
         }
         
         /* 6. Recebe a mensagem (requisição) do cliente */
@@ -130,8 +128,6 @@ int main(int argc, char *argv[]) {
         sscanf(buffer, "%s %s", method, path);
 
 
-        /* --- CORREÇÃO 2: LÓGICA DE ROTEAMENTO (404 / Arquivo / Pasta) --- */
-
         /* 8. Monta o caminho completo do arquivo no disco. (SEM o caso especial /index.html) */
         char filepath[512];
         snprintf(filepath, sizeof(filepath), "%s%s", argv[1], path);
@@ -139,16 +135,13 @@ int main(int argc, char *argv[]) {
         /* 9. Verifica o que existe neste caminho. */
         struct stat st;
         if (stat(filepath, &st) != 0) {
-            /* 9a. O caminho NÃO EXISTE. Retorna 404. */
             char *msg = "HTTP/1.0 404 Not Found\r\n\r\nO arquivo ou diretorio nao foi encontrado.";
             send(client_fd, msg, strlen(msg), 0);
 
         } else if (S_ISREG(st.st_mode)) {
-            /* 9b. O caminho É UM ARQUIVO. Envia o arquivo. */
             send_file(client_fd, filepath);
 
         } else if (S_ISDIR(st.st_mode)) {
-            /* 9c. O caminho É UM DIRETÓRIO. */
             
             // Tenta encontrar um 'index.html' DENTRO deste diretório
             char index_path[600];
@@ -156,14 +149,11 @@ int main(int argc, char *argv[]) {
 
             struct stat index_st;
             if (stat(index_path, &index_st) == 0 && S_ISREG(index_st.st_mode)) {
-                // Se o index.html existir, envia ele
                 send_file(client_fd, index_path);
             } else {
-                // Se não houver index.html, lista o conteúdo do diretório
                 list_directory(client_fd, filepath);
             }
         }
-        /* --- FIM DA CORREÇÃO 2 --- */
 
         close(client_fd);
     }
